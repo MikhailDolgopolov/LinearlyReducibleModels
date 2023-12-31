@@ -171,14 +171,14 @@ class PowerFunctionEstimator(LatexLinearEstimator):
         super().__init__()
 
     def set_my_params(self, a, b):
-        super().set_base_params(np.log(a), b)
         self.allow_negatives = np.round(b, 3) == round(b)
         self.even = self.allow_negatives and np.round(b,3)%2==0
+        super().set_base_params(np.log(a), b)
         return self
 
     def get_my_params(self):
         pms = self.get_base_params()
-        return np.exp(pms[0] / pms[1]) ** abs(pms[1])*np.sign(pms[0]), abs(pms[1])
+        return np.exp(pms[0]*np.sign(pms[1]))*np.sign(pms[1]), abs(pms[1])
 
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
@@ -194,7 +194,7 @@ class PowerFunctionEstimator(LatexLinearEstimator):
         if not (np.any(np.where(y>0)) and np.any(np.where(y<0))):
             y_log *= np.sign(y)
         else:
-            y_log *= np.sign(np.corrcoef(X.ravel(), y)[0, 1])
+            y_log *= np.sign(np.corrcoef(X.ravel(), y)[1, 0])
         self.X_, self.y_ = clean_xy(np.log(np.abs(X)),y_log)
         # plt.scatter(self.X_, self.y_.reshape(-1,1))
         # plt.show()
@@ -205,21 +205,19 @@ class PowerFunctionEstimator(LatexLinearEstimator):
         return self
 
     def predict(self, X):
+        a, b = self.get_my_params()
         if np.any(np.where(X > 0)) and np.any(np.where(X < 0)) and not self.allow_negatives:
             warnings.warn("Attempting to raise negative numbers to fractional powers. One side will be flattened.")
-        X = np.where(X<0, (X if self.allow_negatives else 0), X)
-        zeros = np.where(abs(X) < 0.001, 0, 1).ravel()
-        fiX = (X.ravel() * zeros).reshape(-1, 1)
-        X = np.log(np.abs(fiX))
-        X[np.isneginf(X)] = 0
-        y_pred = self.linear_model.predict(X)
-        a, b = self.get_my_params()
-        result = np.exp(np.abs(y_pred) * zeros)
-        par = round(2 - (b % 2))
-        signs = np.power(np.sign(fiX), par).ravel()
+        X = np.where(X < 0, (X if self.allow_negatives else 0), X)
 
-        a_s = np.sign(a)
-        return (result - (1 - zeros)) * signs * a_s
+        trX = np.log(np.abs(X))
+        clX = np.where(trX<=-2**10, 0, trX)
+        y_pred = self.linear_model.predict(clX)
+        r = np.exp(np.abs(y_pred))
+        par = 2 - (np.round(b, 3) % 2)
+        signs = np.power(np.sign(X), par).ravel()
+        return r * signs * np.sign(a)
+
 
 
 class VerticalShiftHyperbolaEstimator(LatexLinearEstimator):
