@@ -1,7 +1,9 @@
+import warnings
+
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
-
+import matplotlib.pyplot as plt
 from DataWrangling import clean_xy
 from Estimators.LatexLinearEstimator import LatexLinearEstimator, f_f, f_p
 
@@ -34,15 +36,13 @@ class LinearEstimator(LatexLinearEstimator):
 
 class ExponentialEstimator(LatexLinearEstimator):
     def set_my_params(self, a, b):
-        print("I want to set ", (a,b))
-        al=a
+        al = a
         if abs(a) > 0.0000001:
-            al = np.log(abs(a))*np.sign(a)
-        bl=b
+            al = np.log(abs(a)) * np.sign(a)
+        bl = b
         if abs(b) > 0.0000001:
-            bl = np.log(abs(b))*np.sign(a)
+            bl = np.log(abs(b)) * np.sign(a)
 
-        print("In base it's ", (al,bl))
         super().set_base_params(al, bl)
         return self
 
@@ -172,12 +172,13 @@ class PowerFunctionEstimator(LatexLinearEstimator):
 
     def set_my_params(self, a, b):
         super().set_base_params(np.log(a), b)
-        # 
+        self.allow_negatives = np.round(b, 3) == round(b)
+        self.even = self.allow_negatives and np.round(b,3)%2==0
         return self
 
     def get_my_params(self):
         pms = self.get_base_params()
-        return np.exp(pms[0]), pms[1]
+        return np.exp(pms[0] / pms[1]) ** abs(pms[1])*np.sign(pms[0]), abs(pms[1])
 
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
@@ -186,14 +187,39 @@ class PowerFunctionEstimator(LatexLinearEstimator):
     def fit(self, X, y):
         # Check that X and y have correct shape
         X, y = check_X_y(X, y.ravel())
-        self.X_, self.y_ = clean_xy(np.log(X), np.log(y))
+        # plt.scatter(X, y.reshape(-1, 1))
+        # plt.show()
+        y_log = np.log(np.abs(y))
+
+        if not (np.any(np.where(y>0)) and np.any(np.where(y<0))):
+            y_log *= np.sign(y)
+        else:
+            y_log *= np.sign(np.corrcoef(X.ravel(), y)[0, 1])
+        self.X_, self.y_ = clean_xy(np.log(np.abs(X)),y_log)
+        # plt.scatter(self.X_, self.y_.reshape(-1,1))
+        # plt.show()
         self.set_linear_model(LinearRegression().fit(self.X_, self.y_))
+        p = abs(self.get_my_params()[1])
+        self.allow_negatives = np.round(p, 3) == round(p)
+        self.even = self.allow_negatives and np.round(p,3) % 2 == 0
         return self
 
     def predict(self, X):
-        X = np.log(X)
+        if np.any(np.where(X > 0)) and np.any(np.where(X < 0)) and not self.allow_negatives:
+            warnings.warn("Attempting to raise negative numbers to fractional powers. One side will be flattened.")
+        X = np.where(X<0, (X if self.allow_negatives else 0), X)
+        zeros = np.where(abs(X) < 0.001, 0, 1).ravel()
+        fiX = (X.ravel() * zeros).reshape(-1, 1)
+        X = np.log(np.abs(fiX))
+        X[np.isneginf(X)] = 0
+        y_pred = self.linear_model.predict(X)
+        a, b = self.get_my_params()
+        result = np.exp(np.abs(y_pred) * zeros)
+        par = round(2 - (b % 2))
+        signs = np.power(np.sign(fiX), par).ravel()
 
-        return np.exp(self.linear_model.predict(X))
+        a_s = np.sign(a)
+        return (result - (1 - zeros)) * signs * a_s
 
 
 class VerticalShiftHyperbolaEstimator(LatexLinearEstimator):

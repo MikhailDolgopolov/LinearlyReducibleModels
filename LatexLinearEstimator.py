@@ -6,6 +6,8 @@ from copy import copy
 
 from sklearn.linear_model import LinearRegression
 
+from DataWrangling import clean_xy
+
 
 def f_f(f: float) -> str:
     if f > 0:
@@ -59,7 +61,7 @@ class LatexLinearEstimator(BaseEstimator, ABC):
         return self
 
     def calc_r2(self, X, y):
-
+        X, y = clean_xy(X,y)
         y_pred = self.predict(X)
         return metrics.r2_score(y, y_pred)
 
