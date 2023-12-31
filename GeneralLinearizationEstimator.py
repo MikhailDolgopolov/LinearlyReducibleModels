@@ -27,9 +27,9 @@ class GeneralLinearizationEstimator(LatexLinearEstimator):
         self[0].set_my_params(a,b)
 
     def get_equation_string(self, r=8, latex=True):
-        return self[0].get_equation_string(8)
+        return self[0].get_equation_string(8,latex)
 
-    def __init__(self, acceptable_r2_level=0.9):
+    def __init__(self, acceptable_r2_level=0.5):
         super().__init__()
         self.acceptable_r2_level = acceptable_r2_level
         estimators = ["LinearEstimator", "ExponentialEstimator", "HorizontalShiftHyperbolaEstimator",
@@ -41,7 +41,7 @@ class GeneralLinearizationEstimator(LatexLinearEstimator):
 
     def __getitem__(self, item:int)->LatexLinearEstimator:
         if self.ordered[item][1]==-100:
-            raise Exception("Not fitted")
+            raise Exception("Requested estimator was not fitted")
         return self.ordered[item][0]
 
     def fit(self, X, y):
@@ -49,7 +49,7 @@ class GeneralLinearizationEstimator(LatexLinearEstimator):
         for est in self.estimators.keys():
             try:
                 est.fit(X, y)
-                self.estimators[est] = est.calc_r2( X, y)
+                self.estimators[est] = est.calc_r2(X, y)
             except:
                 warnings.warn(f"{est} could not be fitted. You could try removing zeros.")
 
@@ -63,14 +63,15 @@ class GeneralLinearizationEstimator(LatexLinearEstimator):
         if max(self.estimators.values()) < self.acceptable_r2_level:
             print(f"Requested goodness of fit ({self.acceptable_r2_level}) not found.")
 
-        print(f"the best estimator is {best} with coefficient of determination {self.estimators[best]}.")
+        print(self.estimators)
+        # print(f"the best estimator is {best} with coefficient of determination {self.estimators[best]}.")
         return self
 
     def predict(self, X):
         check_is_fitted(self)
         return max(self.estimators, key=self.estimators.get).predict(X)
 
-    def pick_best_concise_model(self, X, y, error=0.01):
+    def pick_best_concise_model(self, X, y, error=0.005):
         good_estimators=[]
         for i in range(len(self.ordered)):
             try:
@@ -80,13 +81,12 @@ class GeneralLinearizationEstimator(LatexLinearEstimator):
 
         px = 0.9
         def th(x):
-            return -0.03*(x-px)+error
+            return -0.04*(x-px)+error
 
         thresholds = [th(r2) for r2 in [est.calc_r2(X,y) for est in good_estimators]]
         places = [good_estimators[i].round_threshold(X,y, thresholds[i]) for i in range(len(good_estimators))]
-        print(places)
         rounded = [copy(good_estimators[i]).round_params(places[i]) for i in range(len(good_estimators))]
-        rating = {rounded[i]:rounded[i].calc_r2(X, y)*(1-places[i]*error**0.5)
+        rating = {rounded[i]:rounded[i].calc_r2(X, y)*(1-places[i]*error*4)
                   for i in range(len(rounded))}
         return [i[0] for i in list(sorted(rating.items(), key=lambda x: x[1], reverse=True))]
 

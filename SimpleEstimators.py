@@ -83,7 +83,10 @@ class HorizontalShiftHyperbolaEstimator(LatexLinearEstimator):
 
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
-        return r"y = \frac{1}{" + f"{b:g}x" + f"{f_f(a)}" + "}"
+        if latex:
+            return r"y = \frac{1}{" + f"{b:g}x" + f"{f_f(a)}" + "}"
+        else:
+            return f"y = 1/({b:g}x{f_f(a)})"
 
     def __init__(self):
         super().__init__()
@@ -114,7 +117,7 @@ class LogarithmicEstimator(LatexLinearEstimator):
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
         mult = r"\cdot" if latex else "*"
-        return f"{b:g}{mult}" + r"\ln x" + f"{f_f(a)}"
+        return f"{b:g}{mult}" + (r"\ln x" if latex else "ln(x)") + f"{f_f(a)}"
 
     def __init__(self):
         super().__init__()
@@ -143,7 +146,9 @@ class OriginBoundHyperbolaEstimator(LatexLinearEstimator):
 
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
-        return r"y = \frac{x}{" + f"{b:g}x" + f"{f_f(a)}" + "}"
+        if latex:
+            return r"y = \frac{x}{" + f"{b:g}x" + f"{f_f(a)}" + "}"
+        return f"y = x/({b:g}x{f_f(a)})"
 
     def __init__(self):
         super().__init__()
@@ -182,22 +187,20 @@ class PowerFunctionEstimator(LatexLinearEstimator):
 
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
-        return f"y = {a:g}x^{{{b:g}}}"
+        return f"y = {a:g}x^{{{b:g}}}" if latex else f"y = {a:g}x^{b:g}"
 
     def fit(self, X, y):
         # Check that X and y have correct shape
         X, y = check_X_y(X, y.ravel())
-        # plt.scatter(X, y.reshape(-1, 1))
-        # plt.show()
-        y_log = np.log(np.abs(y))
 
+        y_log = np.log(np.abs(y))
         if not (np.any(np.where(y > 0)) and np.any(np.where(y < 0))):
             y_log *= np.sign(y)
         else:
             y_log *= np.sign(np.corrcoef(X.ravel(), y)[1, 0])
         self.X_, self.y_ = clean_xy(np.log(np.abs(X)), y_log)
-        # plt.scatter(self.X_, self.y_.reshape(-1,1))
-        # plt.show()
+        plt.scatter(self.X_, self.y_.reshape(-1,1))
+        plt.show()
         self.set_linear_model(LinearRegression().fit(self.X_, self.y_))
         p = abs(self.get_my_params()[1])
         self.allow_negatives = np.round(p, 3) == round(p)
@@ -229,7 +232,8 @@ class VerticalShiftHyperbolaEstimator(LatexLinearEstimator):
 
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
-        return f"{a:g}{f_f(b)}/x"
+
+        return r"y = \frac{"+f"{b:g}"+r"}{x}"+f_f(a) if latex else f"y = {a:g}{f_f(b)}/x"
 
     def __init__(self):
         super().__init__()
