@@ -63,7 +63,12 @@ class LatexLinearEstimator(BaseEstimator, ABC):
     def calc_r2(self, X, y):
         X, y = clean_xy(X,y)
         y_pred = self.predict(X)
-        return metrics.r2_score(y, y_pred)
+        y, y_pred = clean_xy(y, y_pred)
+        try:
+            return metrics.r2_score(y.ravel(), y_pred)
+        except:
+            return 0
+
 
     def round_threshold(self, X, y, step=0.01):
         r = 8
@@ -71,7 +76,7 @@ class LatexLinearEstimator(BaseEstimator, ABC):
         r -= 1
 
         try:
-            while baseline - copy(self[0]).round_params(r).calc_r2(X, y) < step:
+            while baseline - copy(self[0]).round_params(r).calc_r2(X, y) < step and r>=0:
                 r -= 1
 
         except:

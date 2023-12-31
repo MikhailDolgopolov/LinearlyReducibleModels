@@ -80,13 +80,13 @@ class GeneralLinearizationEstimator(LatexLinearEstimator):
 
         px = 0.9
         def th(x):
-            return -0.1*(x-px)+error
+            return -0.03*(x-px)+error
 
         thresholds = [th(r2) for r2 in [est.calc_r2(X,y) for est in good_estimators]]
         places = [good_estimators[i].round_threshold(X,y, thresholds[i]) for i in range(len(good_estimators))]
         print(places)
         rounded = [copy(good_estimators[i]).round_params(places[i]) for i in range(len(good_estimators))]
-        rating = {rounded[i]:rounded[i].calc_r2(X, y)*(1-places[i]*0.02)
+        rating = {rounded[i]:rounded[i].calc_r2(X, y)*(1-places[i]*error**0.5)
                   for i in range(len(rounded))}
         return [i[0] for i in list(sorted(rating.items(), key=lambda x: x[1], reverse=True))]
 

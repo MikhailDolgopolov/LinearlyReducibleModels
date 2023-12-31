@@ -83,7 +83,7 @@ class HorizontalShiftHyperbolaEstimator(LatexLinearEstimator):
 
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
-        return r"y = \frac{1}{" + f"{b}x" + f"{f_f(a)}" + "}"
+        return r"y = \frac{1}{" + f"{b:g}x" + f"{f_f(a)}" + "}"
 
     def __init__(self):
         super().__init__()
@@ -114,7 +114,7 @@ class LogarithmicEstimator(LatexLinearEstimator):
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
         mult = r"\cdot" if latex else "*"
-        return f"{b}{mult}" + r"\ln x" + f"{f_f(a)}"
+        return f"{b:g}{mult}" + r"\ln x" + f"{f_f(a)}"
 
     def __init__(self):
         super().__init__()
@@ -143,7 +143,7 @@ class OriginBoundHyperbolaEstimator(LatexLinearEstimator):
 
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
-        return r"y = \frac{x}{" + f"{b}x" + f"{f_f(a)}" + "}"
+        return r"y = \frac{x}{" + f"{b:g}x" + f"{f_f(a)}" + "}"
 
     def __init__(self):
         super().__init__()
@@ -172,13 +172,13 @@ class PowerFunctionEstimator(LatexLinearEstimator):
 
     def set_my_params(self, a, b):
         self.allow_negatives = np.round(b, 3) == round(b)
-        self.even = self.allow_negatives and np.round(b,3)%2==0
+        self.even = self.allow_negatives and np.round(b, 3) % 2 == 0
         super().set_base_params(np.log(a), b)
         return self
 
     def get_my_params(self):
         pms = self.get_base_params()
-        return np.exp(pms[0]*np.sign(pms[1]))*np.sign(pms[1]), abs(pms[1])
+        return np.exp(pms[0] * np.sign(pms[1])) * np.sign(pms[1]), abs(pms[1])
 
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
@@ -191,17 +191,17 @@ class PowerFunctionEstimator(LatexLinearEstimator):
         # plt.show()
         y_log = np.log(np.abs(y))
 
-        if not (np.any(np.where(y>0)) and np.any(np.where(y<0))):
+        if not (np.any(np.where(y > 0)) and np.any(np.where(y < 0))):
             y_log *= np.sign(y)
         else:
             y_log *= np.sign(np.corrcoef(X.ravel(), y)[1, 0])
-        self.X_, self.y_ = clean_xy(np.log(np.abs(X)),y_log)
+        self.X_, self.y_ = clean_xy(np.log(np.abs(X)), y_log)
         # plt.scatter(self.X_, self.y_.reshape(-1,1))
         # plt.show()
         self.set_linear_model(LinearRegression().fit(self.X_, self.y_))
         p = abs(self.get_my_params()[1])
         self.allow_negatives = np.round(p, 3) == round(p)
-        self.even = self.allow_negatives and np.round(p,3) % 2 == 0
+        self.even = self.allow_negatives and np.round(p, 3) % 2 == 0
         return self
 
     def predict(self, X):
@@ -211,13 +211,12 @@ class PowerFunctionEstimator(LatexLinearEstimator):
         X = np.where(X < 0, (X if self.allow_negatives else 0), X)
 
         trX = np.log(np.abs(X))
-        clX = np.where(trX<=-2**10, 0, trX)
+        clX = np.where(trX <= -2 ** 10, 0, trX)
         y_pred = self.linear_model.predict(clX)
         r = np.exp(np.abs(y_pred))
         par = 2 - (np.round(b, 3) % 2)
         signs = np.power(np.sign(X), par).ravel()
         return r * signs * np.sign(a)
-
 
 
 class VerticalShiftHyperbolaEstimator(LatexLinearEstimator):
