@@ -1,49 +1,63 @@
 import warnings
-
 import numpy as np
 from sklearn.linear_model import LinearRegression
-from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
-import matplotlib.pyplot as plt
-from DataWrangling import clean_xy
-from Estimators.LatexLinearEstimator import LatexLinearEstimator, f_f, f_p
+from sklearn.utils.validation import check_X_y, check_array
+from LatexLinearEstimator import LatexLinearEstimator
+from formatting import f_f, f_p
 
 
 class LinearEstimator(LatexLinearEstimator):
-
-    def set_my_params(self, a, b):
-        super().set_base_params(a, b)
-        return self
-
-    def get_my_params(self):
-        return self.get_base_params()
-
-    def __init__(self):
-        super().__init__()
+    """Linear model: y = a + b * x"""
 
     def fit(self, X, y):
-        self.X_ = X
-        self.y_ = y
+        X, y = check_X_y(X, y)
+        self.X_, self.y_ = X, y
         super().set_linear_model(LinearRegression().fit(X, y))
         return self
 
     def predict(self, X):
+        X = check_array(X)
         return self.linear_model.predict(X)
 
     def get_equation_string(self, r=8, latex=True):
         pms = np.round(self.get_my_params(), r)
         return f"y = {pms[0]:g}{f_f(pms[1])}x"
 
+    def get_my_params(self):
+        # Return intercept (a) and slope (b) from the base class
+        return self.get_base_params()
+
+    def set_my_params(self, a, b):
+        # Set intercept (a) and slope (b) using the base class method
+        super().set_base_params(a, b)
+        return self
+
 
 class ExponentialEstimator(LatexLinearEstimator):
-    def set_my_params(self, a, b):
-        al = a
-        if abs(a) > 0.0000001:
-            al = np.log(abs(a)) * np.sign(a)
-        bl = b
-        if abs(b) > 0.0000001:
-            bl = np.log(abs(b)) * np.sign(a)
+    """Exponential model: y = a * b^x. Assumes y > 0."""
 
-        super().set_base_params(al, bl)
+    def fit(self, X, y):
+        X, y = check_X_y(X, y)
+        if np.any(y <= 0):
+            raise ValueError("y must be positive for exponential model")
+        self.X_, self.y_ = X, np.log(y)
+        super().set_linear_model(LinearRegression().fit(self.X_, self.y_))
+        return self
+
+    def predict(self, X):
+        X = check_array(X)
+        return np.exp(self.linear_model.predict(X))
+
+    def get_my_params(self):
+        # Convert linear params to exponential form: y = a * b^x
+        intercept, slope = super().get_base_params()
+        return np.exp(intercept), np.exp(slope)
+
+    def set_my_params(self, a, b):
+        # Set params by transforming to linear form: ln(y) = ln(a) + x * ln(b)
+        if a <= 0 or b <= 0:
+            raise ValueError("Parameters a and b must be positive")
+        super().set_base_params(np.log(a), np.log(b))
         return self
 
     def get_equation_string(self, r=8, latex=True):
@@ -51,66 +65,59 @@ class ExponentialEstimator(LatexLinearEstimator):
         mult = r"\cdot" if latex else "*"
         return f"{a:g} {mult} {f_p(b)}^x"
 
-    def get_my_params(self):
-        pms = super().get_base_params()
-        return np.exp(pms[0]) * np.sign(pms[1]), np.exp(pms[1] * np.sign(pms[1]))
-
-    def __init__(self):
-        super().__init__()
-
-    def fit(self, X, y):
-        # Check that X and y have correct shape
-        X, y = check_X_y(X, y)
-
-        self.X_, self.y_ = clean_xy(X, np.sign(y) * np.log(np.abs(y)))
-        self.set_linear_model(LinearRegression().fit(self.X_, self.y_))
-        return self
-
-    def predict(self, X):
-        y_pred = self.linear_model.predict(X)
-        s = np.sign(self.get_my_params()[0])
-        return np.exp(y_pred * s) * s
-
 
 class HorizontalShiftHyperbolaEstimator(LatexLinearEstimator):
-
-    def get_my_params(self):
-        return super().get_base_params()
-
-    def set_my_params(self, a, b):
-        super().set_base_params(a, b)
-        return self
-
-    def get_equation_string(self, r=8, latex=True):
-        a, b = np.round(self.get_my_params(), r)
-        if latex:
-            return r"y = \frac{1}{" + f"{b:g}x" + f"{f_f(a)}" + "}"
-        else:
-            return f"y = 1/({b:g}x{f_f(a)})"
-
-    def __init__(self):
-        super().__init__()
+    """Hyperbola with horizontal shift: y = 1 / (b * x + a)"""
 
     def fit(self, X, y):
-        # Check that X and y have correct shape
-        X = check_X_y(X, y.ravel())
-        self.X_, self.y_ = clean_xy(X, 1 / y)
-        self.set_linear_model(LinearRegression().fit(self.X_, self.y_))
-
-        # Return the classifier
+        X, y = check_X_y(X, y)
+        if np.any(y == 0):
+            raise ValueError("y cannot contain zeros")
+        self.X_, self.y_ = X, 1 / y
+        super().set_linear_model(LinearRegression().fit(self.X_, self.y_))
         return self
 
     def predict(self, X):
         X = check_array(X)
         return 1 / self.linear_model.predict(X)
 
-
-class LogarithmicEstimator(LatexLinearEstimator):
-
     def get_my_params(self):
-        return super().get_base_params()
+        # Return parameters a and b directly from base class
+        return self.get_base_params()
 
     def set_my_params(self, a, b):
+        # Set parameters a and b directly
+        super().set_base_params(a, b)
+        return self
+
+    def get_equation_string(self, r=8, latex=True):
+        a, b = np.round(self.get_my_params(), r)
+        return r"y = \frac{1}{" + f"{b:g}x{f_f(a)}" + "}" if latex else f"y = 1/({b:g}x{f_f(a)})"
+
+
+class LogarithmicEstimator(LatexLinearEstimator):
+    """Logarithmic model: y = b * ln(x) + a"""
+
+    def fit(self, X, y):
+        X, y = check_X_y(X, y)
+        if np.any(X <= 0):
+            raise ValueError("X must be positive")
+        self.X_, self.y_ = np.log(X), y
+        super().set_linear_model(LinearRegression().fit(self.X_, self.y_))
+        return self
+
+    def predict(self, X):
+        X = check_array(X)
+        if np.any(X <= 0):
+            raise ValueError("X must be positive")
+        return self.linear_model.predict(np.log(X))
+
+    def get_my_params(self):
+        # Return intercept (a) and slope (b) directly
+        return self.get_base_params()
+
+    def set_my_params(self, a, b):
+        # Set intercept (a) and slope (b) directly
         super().set_base_params(a, b)
         return self
 
@@ -119,133 +126,96 @@ class LogarithmicEstimator(LatexLinearEstimator):
         mult = r"\cdot" if latex else "*"
         return f"{b:g}{mult}" + (r"\ln x" if latex else "ln(x)") + f"{f_f(a)}"
 
-    def __init__(self):
-        super().__init__()
+
+class OriginBoundHyperbolaEstimator(LatexLinearEstimator):
+    """Hyperbola bound to origin: y = x / (b * x + a)"""
 
     def fit(self, X, y):
-        # Check that X and y have correct shape
-        X, y = check_X_y(X, y.ravel())
-        self.X_, self.y_ = clean_xy(np.log(X), y)
-        self.set_linear_model(LinearRegression().fit(self.X_, self.y_))
+        X, y = check_X_y(X, y)
+        if np.any(X == 0) or np.any(y == 0):
+            raise ValueError("X and y cannot contain zeros")
+        self.X_, self.y_ = X, X.squeeze() / y
+        super().set_linear_model(LinearRegression().fit(self.X_, self.y_))
         return self
 
     def predict(self, X):
-        X = np.log(X)
-
-        return self.linear_model.predict(X)
-
-
-class OriginBoundHyperbolaEstimator(LatexLinearEstimator):
+        X = check_array(X)
+        return X.ravel() / self.linear_model.predict(X)
 
     def get_my_params(self):
-        return super().get_base_params()
+        # Return parameters a and b directly
+        return self.get_base_params()
 
     def set_my_params(self, a, b):
+        # Set parameters a and b directly
         super().set_base_params(a, b)
         return self
 
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
-        if latex:
-            return r"y = \frac{x}{" + f"{b:g}x" + f"{f_f(a)}" + "}"
-        return f"y = x/({b:g}x{f_f(a)})"
-
-    def __init__(self):
-        super().__init__()
-
-    def fit(self, X, y):
-        # Check that X and y have correct shape
-
-        if np.count_nonzero(X == 0) > 0 or np.count_nonzero(y == 0) > 0:
-            raise ValueError("Neither inputs should contain 0's")
-
-        self.X_, self.y_ = clean_xy(X, np.divide(X.squeeze(), y))
-        self.set_linear_model(LinearRegression().fit(self.X_, self.y_))
-
-        # Return the classifier
-        return self
-
-    def predict(self, X):
-        base_result = self.linear_model.predict(X)
-        return X.reshape(-1) / base_result
+        return r"y = \frac{x}{" + f"{b:g}x{f_f(a)}" + "}" if latex else f"y = x/({b:g}x{f_f(a)})"
 
 
 class PowerFunctionEstimator(LatexLinearEstimator):
+    """Power model: y = a * x^b"""
 
-    def __init__(self):
-        super().__init__()
-
-    def set_my_params(self, a, b):
-        self.allow_negatives = np.round(b, 3) == round(b)
-        self.even = self.allow_negatives and np.round(b, 3) % 2 == 0
-        super().set_base_params(np.log(a), b)
+    def fit(self, X, y):
+        X, y = check_X_y(X, y)
+        if np.any(X <= 0) or np.any(y <= 0):
+            raise ValueError("X and y must be positive")
+        self.X_, self.y_ = np.log(X), np.log(y)
+        super().set_linear_model(LinearRegression().fit(self.X_, self.y_))
         return self
 
+    def predict(self, X):
+        X = check_array(X)
+        if np.any(X <= 0):
+            raise ValueError("X must be positive")
+        return np.exp(self.linear_model.predict(np.log(X)))
+
     def get_my_params(self):
-        pms = self.get_base_params()
-        return np.exp(pms[0] * np.sign(pms[1])) * np.sign(pms[1]), abs(pms[1])
+        # Convert linear params to power form: y = a * x^b
+        intercept, slope = super().get_base_params()
+        return np.exp(intercept), slope
+
+    def set_my_params(self, a, b):
+        # Set params by transforming to linear form: ln(y) = ln(a) + b * ln(x)
+        if a <= 0:
+            raise ValueError("Parameter a must be positive")
+        super().set_base_params(np.log(a), b)
+        return self
 
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
         return f"y = {a:g}x^{{{b:g}}}" if latex else f"y = {a:g}x^{b:g}"
 
-    def fit(self, X, y):
-        # Check that X and y have correct shape
-        X, y = check_X_y(X, y.ravel())
 
-        y_log = np.log(np.abs(y))
-        if not (np.any(np.where(y > 0)) and np.any(np.where(y < 0))):
-            y_log *= np.sign(y)
-        else:
-            y_log *= np.sign(np.corrcoef(X.ravel(), y)[1, 0])
-        self.X_, self.y_ = clean_xy(np.log(np.abs(X)), y_log)
-        plt.scatter(self.X_, self.y_.reshape(-1,1))
-        plt.show()
-        self.set_linear_model(LinearRegression().fit(self.X_, self.y_))
-        p = abs(self.get_my_params()[1])
-        self.allow_negatives = np.round(p, 3) == round(p)
-        self.even = self.allow_negatives and np.round(p, 3) % 2 == 0
+class VerticalShiftHyperbolaEstimator(LatexLinearEstimator):
+    """Hyperbola with vertical shift: y = b / x + a"""
+
+    def fit(self, X, y):
+        X, y = check_X_y(X, y)
+        if np.any(X == 0):
+            raise ValueError("X cannot contain zeros")
+        self.X_, self.y_ = 1 / X, y
+        super().set_linear_model(LinearRegression().fit(self.X_, self.y_))
         return self
 
     def predict(self, X):
-        a, b = self.get_my_params()
-        if np.any(np.where(X > 0)) and np.any(np.where(X < 0)) and not self.allow_negatives:
-            warnings.warn("Attempting to raise negative numbers to fractional powers. One side will be flattened.")
-        X = np.where(X < 0, (X if self.allow_negatives else 0), X)
+        X = check_array(X)
+        if np.any(X == 0):
+            raise ValueError("X cannot contain zeros")
+        return self.linear_model.predict(1 / X)
 
-        trX = np.log(np.abs(X))
-        clX = np.where(trX <= -2 ** 10, 0, trX)
-        y_pred = self.linear_model.predict(clX)
-        r = np.exp(np.abs(y_pred))
-        par = 2 - (np.round(b, 3) % 2)
-        signs = np.power(np.sign(X), par).ravel()
-        return r * signs * np.sign(a)
-
-
-class VerticalShiftHyperbolaEstimator(LatexLinearEstimator):
     def get_my_params(self):
-        return super().get_base_params()
+        # Return intercept (a) and slope (b) directly
+        return self.get_base_params()
 
     def set_my_params(self, a, b):
+        # Set intercept (a) and slope (b) directly
         super().set_base_params(a, b)
         return self
 
     def get_equation_string(self, r=8, latex=True):
         a, b = np.round(self.get_my_params(), r)
-
-        return r"y = \frac{"+f"{b:g}"+r"}{x}"+f_f(a) if latex else f"y = {a:g}{f_f(b)}/x"
-
-    def __init__(self):
-        super().__init__()
-
-    def fit(self, X, y):
-        X, y = check_X_y(X, y.ravel())
-        self.X_, self.y_ = clean_xy(1 / X, y)
-        self.set_linear_model(LinearRegression().fit(self.X_, self.y_))
-
-        # Return the classifier
-        return self
-
-    def predict(self, X):
-        X = 1 / check_array(X)
-        return self.linear_model.predict(X)
+        return r"y = \frac{" + f"{b:g}" + r"}{x}" + f"{f_f(a)}" if latex else f"y = {b:g}/x{f_f(a)}"
